@@ -63,12 +63,13 @@ public:
         listSize++;
     }
     
-    int size() const {
+    
+    int size(){
         return listSize;
     }
 
-    // Helper for Decompression: Get the head node
-    Node* getHead() const {
+    // helper for decompression to get the head node
+    Node* getHead() {
         return head;
     }
 

@@ -6,15 +6,14 @@ using namespace std;
 
 const int MAX_WINDOW_SIZE = 1024; //maximum size of search window
 
-
 LinkedList lz77Compress(string text) {
 
     LinkedList ledger;
     int i = 0; //starting index of look-ahead window
     while(i < text.size()) {
         //maxmatchlength to find out the largest matched substring in the search buffer.
-        uint8_t maxMatchLength = 0; 
         uint16_t maxMatchDistance = 0;
+        uint8_t maxMatchLength = 0; 
         int startSearch = (i < MAX_WINDOW_SIZE) ? 0 : i - MAX_WINDOW_SIZE;
 
         for (int j = startSearch; j < i ; j++) {
@@ -109,7 +108,7 @@ LinkedList textfileToTriplets(ifstream &inFile) {
 LinkedList binaryFileToTriplets(ifstream &inFile) {
     LinkedList input;
     lz77_triplet tri;
-
+    
     if(inFile.is_open()) {
     while(inFile.read(reinterpret_cast<char*>(&tri.offset), sizeof(tri.offset)) &&
           inFile.read(reinterpret_cast<char*>(&tri.length), sizeof(tri.length)) &&
@@ -121,6 +120,21 @@ LinkedList binaryFileToTriplets(ifstream &inFile) {
     }
     inFile.close();
     return input;
+}
+
+//to cut file extension from filenames
+string getNewFilename(string filename, char type){
+    string baseName = filename;
+    size_t lastDot = filename.find_last_of(".");
+    if (lastDot != string::npos) {
+        baseName = filename.substr(0, lastDot);
+    }
+    if(type == 't') {
+        baseName = baseName + ".txt";
+    } else {
+        baseName = baseName + ".bin";
+    }
+    return baseName;
 }
 
 void compressToBinaryFile(string filename){
@@ -149,10 +163,7 @@ void compressToBinaryFile(string filename){
     } else {
         cout << "File cannot be opened." << endl;
     }
-
-
     inFile.close();
-    
 }
 
 void decompressToTextFile(string filename){
@@ -172,15 +183,13 @@ void decompressToTextFile(string filename){
     } else {
         cerr << "File cannot be opened." << endl;
     }
-    
-
-   
+    infile.close();
 }
 
 int main() {
    
    //compressToBinaryFile("lorem.txt");
-  // decompressToTextFile("lorem.bin");
+   //decompressToTextFile("lorem.bin");
     cout << endl;
     return 0;
 }

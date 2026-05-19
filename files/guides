@@ -1,0 +1,6 @@
+by abstraction the compression program , should have only two functions that are
+compress a text file to binary.
+decompress a binary file to text.
+
+filecompression function would take , filename only. and same would be the decompression function.
+in both compression and decompression a file is being created and removed.
