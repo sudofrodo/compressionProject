@@ -1,10 +1,20 @@
-#include <iostream>
-#include <fstream>
-#include <cstdint>
-using namespace std;
-#include "LinkedList.h"
+#include "lz77.h"
+#include <chrono> // added for measuring compression time
 
+using namespace std;
 const int MAX_WINDOW_SIZE = 1024; //maximum size of search window
+
+string stats = "";
+double compressionratio = 0.0;
+int compressiontime = 0;
+
+double GetCompressionRatio() {
+    return compressionratio;
+}
+
+int GetCompressionTime(){
+    return compressiontime;
+}
 
 LinkedList lz77Compress(string text) {
 
@@ -125,19 +135,74 @@ LinkedList binaryFileToTriplets(ifstream &inFile) {
 //to cut file extension from filenames
 string getNewFilename(string filename, char type){
     string baseName = filename;
-    size_t lastDot = filename.find_last_of(".");
-    if (lastDot != string::npos) {
-        baseName = filename.substr(0, lastDot);
-    }
     if(type == 't') {
-        baseName = baseName + ".txt";
+        size_t dash = filename.find_last_of("-");
+        if (dash != string::npos) {
+        baseName = filename.substr(0,dash) + ".txt";
+        }
     } else {
-        baseName = baseName + ".bin";
+        size_t lastDot = filename.find_last_of(".");
+        if (lastDot != string::npos) {
+        baseName = filename.substr(0, lastDot) + "-lz77.bin";
+        }
     }
     return baseName;
 }
 
+string getCompressionStats(string filename) {
+    
+    ifstream inFile(filename, ios::binary | ios::ate);
+    if (!inFile.is_open()) {
+        cerr << "Error: Cannot open original file to retrieve stats." << endl;
+        return "";
+    }
+    streampos originalSize = inFile.tellg();
+    inFile.close();
+
+    // Start Timer
+    auto start = chrono::high_resolution_clock::now();
+
+    // Execute Compression
+    compressToBinaryFile(filename);
+
+    // End Timer
+    auto end = chrono::high_resolution_clock::now();
+    chrono::duration<double> duration = end - start;
+    double compressionTime = duration.count();
+
+    // Get Compressed File Size
+    string binFileName = getNewFilename(filename, 'b');
+    ifstream binFile(binFileName, ios::binary | ios::ate);
+    streampos compressedSize = 0;
+    if (binFile.is_open()) {
+        compressedSize = binFile.tellg();
+        binFile.close();
+    } else {
+        cerr << "Error: Could not locate compressed file." << endl;
+    }
+
+    // Calculate Compression Percentage (Space Saved)
+    double compressionPercentage = 0.0;
+    if (originalSize > 0) {
+        compressionPercentage = (1.0 - ((double)compressedSize / (double)originalSize)) * 100.0;
+    }
+
+    compressionratio = compressionPercentage;
+    compressiontime = compressionTime;
+
+    string result = "";
+        
+        result += "\nOriginal file size    : " + to_string(originalSize) + " bytes\n";
+        result += "Compressed file size  : " + to_string(compressedSize) + " bytes\n";
+        result += "Compression time      : " + to_string(compressionTime) + " ms\n";
+        result += "Compression percentage: " + to_string(compressionPercentage) + " pc. saved. \n";
+       
+        return result;
+    
+}
+
 void compressToBinaryFile(string filename){
+   // char compressionAlgo[5] = "lz77";
     ifstream inFile(filename);
 
     if(inFile.is_open()) {
@@ -147,6 +212,7 @@ void compressToBinaryFile(string filename){
     ofstream outFile(binFileName, ios::binary);
 
     if(outFile.is_open()) {
+    //outFile.write(compressionAlgo ,sizeof(compressionAlgo));
     LinkedList::Node* curr = ledger.getHead();
     while(curr != nullptr) {
     lz77_triplet tri = curr -> data;
@@ -155,7 +221,7 @@ void compressToBinaryFile(string filename){
     outFile.write(&tri.nextChar, sizeof(tri.nextChar));
     curr = curr -> next;
     }
-    cout << "Compressed successfully.";
+   
     } else {
         cerr << "There's an error creating a binary file." << endl;
     }
@@ -164,6 +230,7 @@ void compressToBinaryFile(string filename){
         cout << "File cannot be opened." << endl;
     }
     inFile.close();
+    stats = getCompressionStats(filename);
 }
 
 void decompressToTextFile(string filename){
@@ -175,7 +242,7 @@ void decompressToTextFile(string filename){
         ofstream outFile(textFilename);
         if(outFile.is_open()) {
         outFile << decompressed;
-        cout << "File decompressed Successfully.";
+        
         } else {
         cerr << "Error : Cannot decompress file." << endl;
         } 
@@ -186,11 +253,4 @@ void decompressToTextFile(string filename){
     infile.close();
 }
 
-int main() {
-   
-   compressToBinaryFile("./files/widget_demo.cpp");
-   //decompressToTextFile("lorem.bin");
-   
-    cout << endl;
-    return 0;
-}
+
