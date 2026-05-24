@@ -1,2 +1,3 @@
-FTXUI
-.vscode
+/FTXUI
+/.vscode
+.gitignore
