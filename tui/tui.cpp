@@ -244,6 +244,8 @@ int main(){
 
     auto decompressButton = Button("Decompress", [&] {
         showAlgoButtons = false;
+        showStats = false;
+        fileCompressed = false;
          if(filename.empty()) {
             status_message = "Error: Please enter a filename first";   
         } else {

@@ -4,8 +4,6 @@
 #include <fstream>
 using namespace std;
 
-string stats = "";
-
 struct Node{
     char ch;
     int freq;
@@ -156,9 +154,19 @@ string readTextFile(const string& filename) {
     return content;
 }
 
+// function to write a file.
+void writeTextFile(const string& filename, const string& text){
+    ofstream outFile(filename);
+    if (outFile.is_open()) {
+        outFile << text;
+        outFile.close();
+        cout << "Decoded output saved " << endl;
+    } else {
+        cout << "Error : cannot write " << endl;
+    }
+}
 
-
-//serialize and deserilize the tree
+//serialize and deserilize the tree : // memory address // number of bytes to write
 void serializeTree(Node* root, ofstream& file) {
     if (!root) return;
     if (!root->left && !root->right) {
@@ -191,11 +199,7 @@ Node* deserializeTree(ifstream& file) {
 
 
 
-// ═══════════════════════════════════════════════════════
-//  PACK — string of '0'/'1' → actual bytes
-//  also stores the original bit count so unpack
-//  knows how many real bits are in the last byte
-// ═══════════════════════════════════════════════════════
+// PACK actual bytes, also stores the original bit count so unpack, knows how many real bits are in the last byte
 void packBits(const string& encoded, ofstream& file) {
     // store total number of bits (4 bytes)
     // needed during unpack to ignore padding in last byte
@@ -217,9 +221,6 @@ void packBits(const string& encoded, ofstream& file) {
     }
 }
 
-// ══════════════════════════════════════════════════════
-//  UNPACK — actual bytes → string of '0'/'1'
-// ══════════════════════════════════════════════════════
 string unpackBits(ifstream& file) {
     // read total bit count we stored during packing
     int totalBits;
@@ -241,80 +242,10 @@ string unpackBits(ifstream& file) {
     return encoded;
 }
 
-string huffgetNewFilename(string filename, char type){
-    string baseName = filename;
-    if(type == 't') {
-        size_t dash = filename.find_last_of("-");
-        if (dash != string::npos) {
-        baseName = filename.substr(0,dash) + ".txt";
-        }
-    } else {
-        size_t lastDot = filename.find_last_of(".");
-        if (lastDot != string::npos) {
-        baseName = filename.substr(0, lastDot) + "-huff.bin";
-        }
-    }
-    return baseName;
-}
-
-string showStats(const string& text, int uniqueCharsCount, const string& encoded) {  
-    // Calculate sizes using int
-    int originalSize = static_cast<int>(text.size());
-    int encodedBits = static_cast<int>(encoded.size());
-    int packedSize = (encodedBits + 7) / 8;
-    
-    // Calculate compression percentage safely
-    double compressionRatio = 0.0;
-    if (originalSize > 0) {
-        compressionRatio = 100.0 - ((static_cast<double>(encodedBits) / 8.0) / originalSize * 100.0);
-    }
-
-    // Piece the string together
-    string result = "";
-    result += "\n======================================\n";
-    result += "Original size  : " + to_string(originalSize) + " bytes\n";
-    result += "Unique chars   : " + to_string(uniqueCharsCount) + "\n";
-    result += "Encoded bits   : " + to_string(encodedBits) + " bits\n";
-    result += "Packed size    : " + to_string(packedSize) + " bytes\n";
-    result += "Compression    : " + to_string(compressionRatio) + " % saved \n";
-    result += "======================================\n";
-
-    return result;
-}
-
 
 //read and write compressed file
-void huffmanFileCompress(const string& filename) {
-    // ── STEP 1: READ INPUT FILE ──────────────────────────
-    string text = readTextFile(filename);
-    if (text.empty()) exit(1);
-
-    // ── STEP 2: FREQUENCY TABLE ──────────────────────────
-    unordered_map<char,int> freqResult = frequencyTable(text);
-
-    // ── STEP 3: BUILD MIN HEAP ───────────────────────────
-    Node* heap[256];
-    int heapSize = 0;
-    for (const auto& pair : freqResult) {
-        Node* node  = new Node();
-        node->ch    = pair.first;
-        node->freq  = pair.second;
-        heap[heapSize++] = node;
-    }
-    build_min_heap(heap, heapSize);
-
-    // ── STEP 4: BUILD HUFFMAN TREE ───────────────────────
-    Node* root = huffmanTree(heap, heapSize);
-
-    // ── STEP 5: GENERATE CODES ───────────────────────────
-    unordered_map<char, string> codes;
-    generateCodes(root, "", codes);
-
-    // ── STEP 6: ENCODE ───────────────────────────────────
-    string encoded = encode(text, codes);
-
-    string newfilename = huffgetNewFilename(filename,'b');
-    ofstream file(newfilename, ios::binary);
+void writeCompressedFile(const string& filename, const string& encoded, Node* root) {
+    ofstream file(filename, ios::binary);
     if (!file.is_open()) {
         cout << "Error: cannot write to " << filename << endl;
         return;
@@ -328,8 +259,6 @@ void huffmanFileCompress(const string& filename) {
     int packedBytes = (origBits + 7) / 8; // bytes after packing
     cout << "Huffman bits : " << origBits   << " bits" << endl;
     cout << "Packed into  : " << packedBytes << " bytes" << endl;
-
-    stats = showStats(text, static_cast<int>(freqResult.size()), encoded);
 }
 
 string readCompressedFile(const string& filename, Node*& root) {
@@ -344,24 +273,61 @@ string readCompressedFile(const string& filename, Node*& root) {
     return encoded;
 }
 
-// function to write a file.
-void huffmanFileDecompress(const string& filename){
-    Node* loadedRoot = nullptr;
-    string loadedEncoded = readCompressedFile(filename, loadedRoot);
-    const string& text = decode(loadedEncoded, loadedRoot);
-    string newFileName = huffgetNewFilename(filename,'t');
-    ofstream outFile(newFileName);
-    if (outFile.is_open()) {
-        outFile << text;
-        outFile.close();
-        cout << "Decoded output saved " << endl;
-    } else {
-        cout << "Error : cannot write " << endl;
+
+int main(){
+
+    //READ INPUT FILE
+    string text = readTextFile("./files/alice29.txt");
+    if (text.empty()) return 1;
+
+    //FREQUENCY TABLE 
+    unordered_map<char,int> freqResult = frequencyTable(text);
+
+    //BUILD MIN HEAP 
+    Node* heap[256];
+    int heapSize = 0;
+    for (const auto& pair : freqResult) {
+        Node* node  = new Node();
+        node->ch    = pair.first;
+        node->freq  = pair.second;
+        heap[heapSize++] = node;
     }
-}
+    build_min_heap(heap, heapSize);
 
+    //BUILD HUFFMAN TREE 
+    Node* root = huffmanTree(heap, heapSize);
 
-int main() {
-    huffmanFileCompress("./files/commands.txt");
+    //GENERATE CODES
+    unordered_map<char, string> codes;
+    generateCodes(root, "", codes);
+
+    //ENCODE
+    string encoded = encode(text, codes);
+
+    //WRITE COMPRESSED FILE
+    writeCompressedFile("./files/output.bin", encoded, root);
+
+    //READ + DECODE
+    Node* loadedRoot = nullptr;
+    string loadedEncoded = readCompressedFile("./files/output.bin", loadedRoot);
+    string decoded = decode(loadedEncoded, loadedRoot);
+
+    //write text file
+    writeTextFile("./files/output.txt",decoded);
+
+    //Output Statistics
+    cout << "\n======================================" << endl;
+    cout << "Original size  : " << text.size()    << " bytes" << endl;
+    cout << "Unique chars   : " << freqResult.size() << endl;
+    cout << "Encoded bits   : " << encoded.size() << " bits"  << endl;
+    cout << "Packed size    : " << (encoded.size()+7)/8 << " bytes" << endl;
+    cout << "Compression    : " << (100.0 - ((encoded.size()/8.0) / text.size() * 100.0)) << " % saved " << endl;
+    cout << "======================================" << endl;
+
+    if (decoded == text)
+    cout << "Round trip: SUCCESS " << endl;
+    else
+    cout << "Round trip: FAILED  " << endl;
+
     return 0;
 }
